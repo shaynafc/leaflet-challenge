@@ -1,254 +1,94 @@
-
-
-var API_quakes = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_month.geojson"
-
-var API_plates = "https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json"
-
-var fault_line_url = "https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json";
-
-// Create a map.
-function createMap(quakeLayers, timelineLayer,faultlineLayer, legend) {
-
-  // Create the tile layer that will be the background of the world map displaying earthquakes.
-  var lightMap = L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/light-v9/tiles/256/{z}/{x}/{y}?access_token={accessToken}", {
-      attribution: "Map data &copy; <a href=\"http://openstreetmap.org\">OpenStreetMap</a> contributors, <a href=\"http://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>, Imagery © <a href=\"http://mapbox.com\">Mapbox</a>",
-      maxZoom: 18,
-      id: "mapbox.light",
-      accessToken: API_KEY
-  });
-
-  // Create the tile layer that will be the background of the timeline displaying of earthquakes.
-  var tlMap = L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/light-v9/tiles/256/{z}/{x}/{y}?access_token={accessToken}", {
-      attribution: "Map data &copy; <a href=\"http://openstreetmap.org\">OpenStreetMap</a> contributors, <a href=\"http://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA</a>, Imagery © <a href=\"http://mapbox.com\">Mapbox</a>",
-      maxZoom: 18,
-      id: "mapbox.light",
-      accessToken: API_KEY
-  });
-  var streemap = L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/outdoors-v11/tiles/256/{z}/{x}/{y}?access_token={accessToken}", {
-        accessToken: API_KEY
-    });
-
-  var satmap = L.tileLayer("https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v11/tiles/256/{z}/{x}/{y}?access_token={accessToken}", {
-        accessToken: API_KEY
-    });
-
-  var googleTerrain = L.tileLayer('http://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
-        maxZoom: 20,
-        subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-    });
-
-  
-  var myMap = L.map("map-id", {
-      center: [36.77, -119.41],
-      zoom: 6,
-      layers: [lightMap, faultlineLayer].concat(d3.values(quakeLayers))
-      // layers: [lightMap,quakeLayers]
-  });
-
-  
-  var baseMaps = {
-      "Street Map": streemap,
-      "Satellite Map": satmap,
-      "Google Map":googleTerrain,
-      "Light Map": lightMap,
-      "Timeline": tlMap
-  };
-
  
-
+ var streetmap = L.tileLayer("https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}", {
+    attribution: "© <a href='https://www.mapbox.com/about/maps/'>Mapbox</a> © <a href='http://www.openstreetmap.org/copyright'>OpenStreetMap</a> <strong><a href='https://www.mapbox.com/map-feedback/' target='_blank'>Improve this map</a></strong>",
+    tileSize: 512,
+    maxZoom: 15,
+    zoomOffset: -1,
+    id: "mapbox/streets-v11",
+    accessToken: API_KEY
+  });
   
-  var timelineControl = L.timelineSliderControl({
-          formatOutput: function(date) {
-              return new Date(date).toString().slice(0, 24).replace(/ /g, '_');
-          }
-      });
-
+  // Create map
+  var myMap = L.map("map", {
+    center: [
+      39.8283, -102.5795
+    ],
+    zoom: 3.5,
+    });
+  
+  streetmap.addTo(myMap);
   
   
-  var layersControl = L.control.layers(baseMaps, quakeLayers, {
-      collapsed: false
-  }).addTo(myMap);
-
+  var queryUrl = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson";
   
-  legend.addTo(myMap);
-
-  
-  myMap.on('baselayerchange', function (e) {
-
-
-      if (e.name == 'Timeline') {
-
-        
-        for (var layer of d3.values(quakeLayers)) {
-          layer.remove();
-          layersControl.removeLayer(layer);
-      }
-
-      timelineControl.addTo(myMap);
-      timelineControl.addTimelines(timelineLayer);
-      timelineLayer.addTo(myMap);
-      }
-
-        
-    else {
-      
-        timelineControl.remove();
-        timelineLayer.remove();
-        for (var layer of d3.values(quakeLayers)) {
-          layer.remove();
-          layersControl.removeLayer(layer);
-      }
-        for (var layer of d3.entries(quakeLayers)) {
-            layer.value.addTo(myMap);
-            layersControl.addOverlay(layer.value, layer.key);
-        }
+  d3.json(queryUrl, function(data) {
+    function styleMap(feature) {
+      console.log(feature)
+      return {
+        opacity: 1,
+        fillOpacity: 1,
+        fillColor: getColor(feature.geometry.coordinates[2]),
+        color: "#000000",
+        radius: getRadius(feature.properties.mag),
+        stroke: true,
+        weight: 0.5
+      };
     }
-
-        
-  });
-}
-
-
-// Add tool tip and pop up information to each earthquake marker.
-function addPopupInfo(feature, layer) {
-
-  // If this feature has properties named 'mag', 'place' and 'time', add a Tool Tip.
-  if (feature.properties && feature.properties.mag &&
-      feature.properties.place && feature.properties.time) {
-          layer.bindTooltip('<div align="center"><div>Magnitude: '  + feature.properties.mag +
-                            '</div><div>Place: ' + feature.properties.place +
-                            '</div><div>Date: ' + new Date(+feature.properties.time).toDateString() +
-                            '</div><div>(Click circle for USGS link)</div></div>');
-  }
-
-}
-
-
-
-
-// Perform an API call to the USGS API to get earthquake information (past 30 days, 2.5+ magnitude and greater)
-//
-d3.json(API_quakes).then((geojsonData) => {
-  console.log(geojsonData);
-
- 
-  var colorRange = ['#fcfbfd','#3f007d'],
-      ringColor = '#000000',
-      magMinMax   = d3.extent(geojsonData.features.map((f) => f.properties.mag)),
-      range      = [0, geojsonData.features.length - 1];
-      getType   = d3.extent(geojsonData.features.map((f) => f.properties.type)),
-      magDomain = [1,magMinMax[1]]
-      //Log number of features in the console. Keeping 'range' for future feature.
-      console.log(range);
-      console.log(magMinMax)
-  // Create a legend.
-  var legend  = L.control({position: 'bottomright'}),
-      magBins = d3.ticks(Math.floor(magMinMax[0]), magMinMax[1], Math.ceil(magMinMax[1] - magMinMax[0]));
-
-
-  // Scale the colors.
-  var colorScaleQuake  = d3.scaleLinear().domain(magMinMax).range(colorRange);
-      colorScaleLegend  = d3.scaleLinear().domain(magDomain).range(colorRange);
-  
-
-  // Implement the 'onAdd()' function.
-  legend.onAdd = function () {
-
-      var div = L.DomUtil.create('div', 'info legend');
-
-      div.innerHTML += "<h4 style='margin:4px'>Magnitude</h4>"
-
-      // Testing color in legend
-      // div.innerHTML += '<i style="background: ' + testColor + '"></i> test<br>';
-
-      for (var i = 0; i < magBins.length; i++) {
-          div.innerHTML +=
-              '<i style="background: ' + colorScaleLegend(magBins[i]) + '"></i> ' +
-              magBins[i] + (magBins[i + 1] ? '&ndash;' + magBins[i + 1] : '+') + '<br>';
+      // change color 
+      function getColor(coordinates) {
+      switch (true) {
+      case coordinates < 10:
+        return "#ffbdbd";
+      case coordinates >= 10 && coordinates < 30:
+        return "#ff5757";
+      case coordinates >= 30 && coordinates < 50:
+        return "#ff0000";
+      case coordinates >= 50 && coordinates < 70:
+        return "#c70000";
+      case coordinates >= 70 && coordinates < 90:
+        return "#870000";
+      default:
+        return "#400000";
       }
-     
-      return div;
-  }
-
-
-  
-  // Initialize an object used to hold the earthquake layers.
-  var quakeLayers = {};
-
-  for (var i = 0; i < magBins.length; i++) {
-
-      // Create an overlay layer of earthquake markers for quakes within a magnitude range.
-      var quakeLayer = L.geoJSON(geojsonData.features, {
-                  filter: function (feature) {
-                      return (i == magBins.length - 1 ?
-                              (+feature.properties.mag >= magBins[i]) :
-                              (+feature.properties.mag >= magBins[i])  &&
-                              (+feature.properties.mag < magBins[i + 1]));
-                  },
-                  pointToLayer: function (feature, latlng) {
-                      return L.circleMarker(latlng, {
-                      radius: +feature.properties.mag * 2,
-                      fillColor: colorScaleQuake(+feature.properties.mag),
-                      color: ringColor ,
-                      weight: 1,
-                      fillOpacity: 0.9,
-                  });
-                  },
-                  onEachFeature: addPopupInfo,
-              });
-
-      // Create a label for the magnitude bin and add the layer to quakeLayers.
-      var lvlKey = magBins[i] + (magBins[i + 1] ? '-' + magBins[i + 1] : '+');
-      quakeLayers[lvlKey] = quakeLayer;
-  };
-
-  
-  var timelineLayer = new L.Timeline(geojsonData, {
-              getInterval: function (quake) {
-                  return ({
-                      start: quake.properties.time,
-                      end:   quake.properties.time + 86400000,
-                          });
-              },
-              pointToLayer: function (quake, latlng) {
-                  return L.circleMarker(latlng, {
-                  radius: +quake.properties.mag * 2,
-                  fillColor: colorScaleQuake(+quake.properties.mag),
-                  color: ringColor,
-                  weight: 1,
-                  fillOpacity: 0.9,
-              });
-              },
-              onEachFeature: addPopupInfo,
-          });
-
- 
-  createMap(quakeLayers, timelineLayer, faultlineLayer, legend);
-
-}, (reason) => {
-  console.log(reason);
-});
-
-
-var faultlineLayer = L.layerGroup();
-
-d3.json(fault_line_url, function (data) {
-    var mystyle = {
-        "color": "#ff7800",
-        "weight": 4,
-        "opacity": 0.9
-    };
-
-    L.geoJSON(data, {
-        style: mystyle,
-        onEachFeature: function (feature, layer) {
-            layer.bindPopup("<h3><u>plate name</u>: " + feature.properties.Name + "</h3>");
-            layer.on({
-                "mouseover": highlightFeature,
-                "mouseout": resetFeature
-            });
-            faultlineLayer.addLayer(layer);
+    }
+      // calculate
+      function getRadius(mag) {
+      if (mag === 0) {
+        return 1;
+      }
+      return mag * 5;
+    }
+      
+      L.geoJson(data, {
+        pointToLayer: function(feature, latlng) {
+          return L.circleMarker(latlng);
+        },
+        style: styleMap,
+        onEachFeature: function(feature, layer) {
+          layer.bindPopup("Magnitude: " + feature.properties.mag + "<br>Location: " + feature.properties.place);
         }
-    });
-});
-
+      }).addTo(myMap);
+      
+      // create legend 
+      var legend = L.control({
+        position: "bottomright"
+      });
+      
+      legend.onAdd = function() {
+      var div = L.DomUtil.create("div", "info legend");
+      var depths = [-10,10,30,50,70,90];
+      var colors = ["#ffbdbd", "#ff5757", "#ff0000", "#c70000", "#870000", "#400000"];
+      
+      for (var i = 0; i < depths.length; i++) {
+        div.innerHTML += "<i style='background: " + colors[i] + "'></i> "
+        + depths[i] + (depths[i + 1] ? "&ndash;" + depths[i + 1] + "<br>" : "+");
+        console.log(colors[i]);
+      }
+      return div;
+    };
+  
+    legend.addTo(myMap);
+  
+  });
+  
+  
