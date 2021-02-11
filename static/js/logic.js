@@ -1,7 +1,6 @@
 
 
 var API_quakes = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_month.geojson"
-//var API_quakes = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_week.geojson"
 
 var API_plates = "https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_boundaries.json"
 
@@ -38,7 +37,7 @@ function createMap(quakeLayers, timelineLayer,faultlineLayer, legend) {
         subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
     });
 
-  // Create a map using the lightMap tile layer and the earthquake layers (quakeLayers).
+  
   var myMap = L.map("map-id", {
       center: [36.77, -119.41],
       zoom: 6,
@@ -46,7 +45,7 @@ function createMap(quakeLayers, timelineLayer,faultlineLayer, legend) {
       // layers: [lightMap,quakeLayers]
   });
 
-  // Create a baseMaps object to hold the tile layers (lightMap & tlMap).
+  
   var baseMaps = {
       "Street Map": streemap,
       "Satellite Map": satmap,
@@ -55,38 +54,31 @@ function createMap(quakeLayers, timelineLayer,faultlineLayer, legend) {
       "Timeline": tlMap
   };
 
-  //    Tring to add faultlineLayer
-  //    Create an overlayMaps object here to contain the "Earthquake" and "Fault Line" layers
-  //    var overlayMaps = {
-  //     "Earthquake": quakeLayers,
-  //     "Fault Line": faultlineLayer
-  // };
+ 
 
-  // Create a timeline control.
+  
   var timelineControl = L.timelineSliderControl({
           formatOutput: function(date) {
               return new Date(date).toString().slice(0, 24).replace(/ /g, '_');
           }
       });
 
-  // Create a layer control, passing in the baseMaps and quakeLayers.
-  // Add the layer control to the map.
+  
+  
   var layersControl = L.control.layers(baseMaps, quakeLayers, {
       collapsed: false
   }).addTo(myMap);
 
-  // Add the legend to the map.
+  
   legend.addTo(myMap);
 
-  // Add a listener for a 'Base Layer change' to the map.
+  
   myMap.on('baselayerchange', function (e) {
 
 
       if (e.name == 'Timeline') {
 
-        // If the 'Timeline' base layer was selected, remove the quakeLayers
-        // from the map and the quakeLayers overlayer controls. Add the
-        // timeline control and the timeline overlayer to the map.
+        
         for (var layer of d3.values(quakeLayers)) {
           layer.remove();
           layersControl.removeLayer(layer);
@@ -99,13 +91,7 @@ function createMap(quakeLayers, timelineLayer,faultlineLayer, legend) {
 
         
     else {
-      // If other than 'Timeline' base layer was selected, remove the timeline
-      // control and the timeline layer. 
-      // quakeLayers controls are first removed from map in case controls
-      // already exits on map. NECESSARY when switching between non-TimeLine layers.
-      // Add quakeLayers to the map and the
-      // quakeLayers overlayer controls.
-      //
+      
         timelineControl.remove();
         timelineLayer.remove();
         for (var layer of d3.values(quakeLayers)) {
@@ -145,10 +131,7 @@ function addPopupInfo(feature, layer) {
 d3.json(API_quakes).then((geojsonData) => {
   console.log(geojsonData);
 
-  // Create a logarithmic color scale for filling the earthquake
-  // markers. Set a default color for the ring around an earthquake
-  // marker.
-  //
+ 
   var colorRange = ['#fcfbfd','#3f007d'],
       ringColor = '#000000',
       magMinMax   = d3.extent(geojsonData.features.map((f) => f.properties.mag)),
@@ -219,7 +202,7 @@ d3.json(API_quakes).then((geojsonData) => {
       quakeLayers[lvlKey] = quakeLayer;
   };
 
-  // Create an overlay layer for the earthquake timeline.
+  
   var timelineLayer = new L.Timeline(geojsonData, {
               getInterval: function (quake) {
                   return ({
@@ -239,15 +222,14 @@ d3.json(API_quakes).then((geojsonData) => {
               onEachFeature: addPopupInfo,
           });
 
-  // Pass the earthquake overlay layers, the timeline overlay layer and the
-  // legend to the createMap() function.
+ 
   createMap(quakeLayers, timelineLayer, faultlineLayer, legend);
 
 }, (reason) => {
   console.log(reason);
 });
 
-// Create layer for fault lines
+
 var faultlineLayer = L.layerGroup();
 
 d3.json(fault_line_url, function (data) {
@@ -269,5 +251,4 @@ d3.json(fault_line_url, function (data) {
         }
     });
 });
-
 
